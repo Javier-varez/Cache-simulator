@@ -7,7 +7,7 @@ int misses[100];
 
 int main(int argc, char * argv[]) {
 
-    cache_t *cache = cache_new(8, 2, LRU);
+    cache_t *cache = cache_new(8, 1, LRU);
 
     uint32_t miss_count = 0;
 

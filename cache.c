@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include  <fcntl.h>
+#include <unistd.h>
 
 uint32_t process_cache_miss(cache_t * cache, uint32_t set_addr, uint32_t tag, uint32_t block_addr);
 
@@ -138,18 +140,41 @@ cache_lookup_t write_block_addr(cache_t *cache, uint32_t block_addr, void *block
 uint32_t process_cache_miss(cache_t * cache, uint32_t set_addr, uint32_t tag, uint32_t block_addr) {
   enum replacement_schemes policy = cache->scheme;
 
-  // Search for smallest time stamp (block to replace inside set)
-  uint32_t ts_min = 0xFFFFFFFF;
   uint32_t block_index = 0;
-  for (uint32_t i = set_addr; i < set_addr + cache->blocks_per_set; i++) {
-    if (cache->blocks[i].valid == 0) {
-      block_index = i;
-      break;
-    }
-    else if (cache->blocks[i].time_stamp < ts_min) {
-      block_index = i;
-      ts_min = cache->blocks[i].time_stamp;
-    }
+  uint32_t ts_min = 0xFFFFFFFF;
+
+  switch(policy) {
+    case LRU:
+    case FIFO:
+      // Search for smallest time stamp (block to replace inside set)
+	  for (uint32_t i = set_addr; i < set_addr + cache->blocks_per_set; i++) {
+		if (cache->blocks[i].valid == 0) {
+		  block_index = i;
+		  break;
+		}
+		else if (cache->blocks[i].time_stamp < ts_min) {
+		  block_index = i;
+		  ts_min = cache->blocks[i].time_stamp;
+		}
+	  }
+	  break;
+    case RANDOM:
+	  for (uint32_t i = set_addr; i < set_addr + cache->blocks_per_set; i++) {
+		if (cache->blocks[i].valid == 0) {
+		  block_index = i;
+		  break;
+		}
+	  }
+      
+      // There are no free blocks in the set, need to select random
+      uint32_t fd = open("/dev/urandom", O_RDONLY);
+	  uint8_t byte;
+      read(fd,  &byte,  1); 
+      block_index = set_addr + (byte*cache->blocks_per_set)/256;
+      close(fd);
+	  break;
+    default:
+	  break;
   }
 
   // Replace block
